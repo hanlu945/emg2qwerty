@@ -15,10 +15,10 @@ import hydra
 import pytorch_lightning as pl
 from hydra.utils import get_original_cwd, instantiate
 from omegaconf import DictConfig, ListConfig, OmegaConf
+from pytorch_lightning.loggers import CSVLogger
 
 from emg2qwerty import transforms, utils
 from emg2qwerty.transforms import Transform
-
 
 log = logging.getLogger(__name__)
 
@@ -34,11 +34,7 @@ def main(config: DictConfig):
         python_paths.append(working_dir)
         os.environ["PYTHONPATH"] = os.pathsep.join(python_paths)
 
-    # Seed for determinism. This seeds torch, numpy and python random modules
-    # taking global rank into account (for multi-process distributed setting).
-    # Additionally, this auto-adds a worker_init_fn to train_dataloader that
-    # initializes the seed taking worker_id into account per dataloading worker
-    # (see `pl_worker_init_fn()`).
+    # Seed for determinism
     pl.seed_everything(config.seed, workers=True)
 
     # Helper to instantiate full paths for dataset sessions
@@ -90,10 +86,17 @@ def main(config: DictConfig):
     callback_configs = config.get("callbacks", [])
     callbacks = [instantiate(cfg) for cfg in callback_configs]
 
+    # CSV logger
+    csv_logger = CSVLogger(
+        save_dir=config.trainer.default_root_dir,
+        name="csv_logs",
+    )
+
     # Initialize trainer
     trainer = pl.Trainer(
         **config.trainer,
         callbacks=callbacks,
+        logger=csv_logger,
     )
 
     if config.train:
@@ -111,8 +114,7 @@ def main(config: DictConfig):
             trainer.checkpoint_callback.best_model_path
         )
 
-    # Validate and test on the best checkpoint (if training), or on the
-    # loaded `config.checkpoint` (otherwise)
+    # Validate and test
     val_metrics = trainer.validate(module, datamodule)
     test_metrics = trainer.test(module, datamodule)
 

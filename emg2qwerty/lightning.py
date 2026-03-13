@@ -227,12 +227,28 @@ class TDSConvCTCModule(pl.LightningModule):
             target = LabelData.from_labels(targets[: target_lengths[i], i])
             metrics.update(prediction=predictions[i], target=target)
 
-        self.log(f"{phase}/loss", loss, batch_size=N, sync_dist=True)
+        #self.log(f"{phase}/loss", loss, batch_size=N, sync_dist=True)
+        self.log(
+            f"{phase}/loss",
+            loss,
+            batch_size=N,
+            sync_dist=True,
+            on_step=False,
+            on_epoch=True,
+            logger=True,
+        )
         return loss
 
     def _epoch_end(self, phase: str) -> None:
         metrics = self.metrics[f"{phase}_metrics"]
-        self.log_dict(metrics.compute(), sync_dist=True)
+        # self.log_dict(metrics.compute(), sync_dist=True)
+        self.log_dict(
+            metrics.compute(),
+            sync_dist=True,
+            on_step=False,
+            on_epoch=True,
+            logger=True,
+        )
         metrics.reset()
 
     def training_step(self, *args, **kwargs) -> torch.Tensor:
